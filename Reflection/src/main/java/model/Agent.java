@@ -134,6 +134,7 @@ public class Agent {
     public Object clone(Object toClone) throws Exception {
         Class<?> clazz = toClone.getClass();
         Constructor<?> constructor = clazz.getDeclaredConstructor();
+        constructor.setAccessible(true);
         Object clone = constructor.newInstance();
         Field[] toCloneFields = clazz.getDeclaredFields();
         for (int i = 0; i < toCloneFields.length; i++) {
@@ -143,13 +144,12 @@ public class Agent {
             toCloneFields[i].setAccessible(true);
             toCloneFields[i].set(clone, toCloneFields[i].get(toClone));
         }
-
         return clone;
     }
 
 
     public static void main(String[] args) {
-        System.out.println(new Agent().debrief(new Person()));
+//        System.out.println(new Agent().debrief(new Person()));
 //        Class<?> clazz = null;
 //        try {
 //            clazz = Class.forName(Person.class.getName());
@@ -172,3 +172,27 @@ public class Agent {
 
 
 }
+
+//class Cloner {
+//
+//    private Class<?> primaryClass;
+//    private Object toBeCloned;
+//
+//
+//    public Cloner(Object toBeCloned) throws NullPointerException {
+//        if (toBeCloned == null)
+//            throw new NullPointerException();
+//        this.toBeCloned = toBeCloned;
+//        this.primaryClass = toBeCloned.getClass();
+//    }
+//
+//    public Object clone() {
+//        if (toBeCloned == null)
+//            return null;
+//        if (primaryClass.isArray())
+//            return ((Array) toBeCloned).Clone();
+//        Object clone =
+//    }
+//
+//
+//}
