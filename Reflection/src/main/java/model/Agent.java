@@ -1,9 +1,6 @@
 package model;
 
-import model.man.Person;
 import java.lang.reflect.*;
-import java.time.LocalDate;
-import java.time.Month;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -89,27 +86,7 @@ public class Agent {
         return "";
     }
 
-
-
-    public String debrief(Object object) {
-        StringBuilder information = new StringBuilder();
-        Class<?> objectClass = object.getClass();
-        information.append("Name: ").append(objectClass.getSimpleName()).append(System.lineSeparator());
-        information.append("Package: ").append(objectClass.getPackage().getName()).append(System.lineSeparator());
-        information.append("No. of Constructors: ").append(objectClass.getDeclaredConstructors().length).append(System.lineSeparator());
-        information.append("===").append(System.lineSeparator());
-        information.append("Fields:").append(System.lineSeparator());
-        Field[] declaredFields = objectClass.getDeclaredFields();
-        List<Field> fields = new ArrayList<>();
-        Collections.addAll(fields, declaredFields);
-        fields.sort(Comparator.comparing(Field::getName));
-        for (Field field : fields)
-            information.append(getModifierName(field)).append(getStaticState(field)).append(" ")
-                    .append(field.getType().getSimpleName()).append(" ").append(field.getName())
-                    .append(System.lineSeparator());
-        information.append("(").append(declaredFields.length).append(" fields)").append(System.lineSeparator());
-        information.append("===").append(System.lineSeparator());
-        information.append("Methods:").append(System.lineSeparator());
+    private void setClassMethodsInfo(StringBuilder information, Class<?> objectClass) {
         Method[] declaredMethods = objectClass.getDeclaredMethods();
         List<Method> methods = new ArrayList<>();
         Collections.addAll(methods, declaredMethods);
@@ -127,72 +104,92 @@ public class Agent {
             information.append(method.getReturnType().getSimpleName()).append(" ").append(signature).append(System.lineSeparator());
         }
         information.append("(").append(declaredMethods.length).append(" methods)");
+    }
+
+    private void setClassFieldsInfo(StringBuilder information, Class<?> objectClass) {
+        Field[] declaredFields = objectClass.getDeclaredFields();
+        List<Field> fields = new ArrayList<>();
+        Collections.addAll(fields, declaredFields);
+        fields.sort(Comparator.comparing(Field::getName));
+        for (Field field : fields)
+            information.append(getModifierName(field)).append(getStaticState(field)).append(" ")
+                    .append(field.getType().getSimpleName()).append(" ").append(field.getName())
+                    .append(System.lineSeparator());
+        information.append("(").append(declaredFields.length).append(" fields)").append(System.lineSeparator());
+        information.append("===").append(System.lineSeparator());
+        information.append("Methods:").append(System.lineSeparator());
+    }
+
+    private void setClassInfo(StringBuilder information, Class<?> objectClass) {
+        information.append("Name: ").append(objectClass.getSimpleName()).append(System.lineSeparator());
+        information.append("Package: ").append(objectClass.getPackage().getName()).append(System.lineSeparator());
+        information.append("No. of Constructors: ").append(objectClass.getDeclaredConstructors().length).append(System.lineSeparator());
+        information.append("===").append(System.lineSeparator());
+        information.append("Fields:").append(System.lineSeparator());
+    }
+
+    public String debrief(Object object) {
+        StringBuilder information = new StringBuilder();
+        Class<?> objectClass = object.getClass();
+        setClassInfo(information, objectClass);
+        setClassFieldsInfo(information, objectClass);
+        setClassMethodsInfo(information, objectClass);
         return information.toString();
     }
 
 
+    private void cloneObject(Object toClone, Object clone, Field field) throws Exception {
+        field.setAccessible(true);
+        Field modifiersField = Field.class.getDeclaredField("modifiers");
+        modifiersField.setAccessible(true);
+        modifiersField.setInt(field, field.getModifiers() & ~Modifier.PRIVATE & ~Modifier.FINAL);
+        field.setAccessible(true);
+        if (field.get(toClone) == null)
+            return;
+        if (field.getType().isPrimitive() || field.getType().equals(Boolean.class)
+                || field.getType().equals(String.class) || field.get(toClone) instanceof Enum<?>)
+            field.set(clone, field.get(toClone));
+        else if (field.getType().getSuperclass() == null)
+            field.set(clone, clone(field.get(toClone)));
+        else if (field.getType().getSuperclass().equals(Number.class))
+            field.set(clone, field.get(toClone));
+        else {
+            if (field.getType().isArray()) {
+                int arraySize = Array.getLength(field.get(toClone));
+                Class<?> componentType = field.getType().getComponentType();
+                Object array = Array.newInstance(componentType, arraySize);
+                for (int i = 0; i < arraySize; i++) {
+                    Object element = Array.get(field.get(toClone), i);
+                    if (componentType.isPrimitive() || componentType.equals(Boolean.class)
+                            || componentType.equals(String.class) || element instanceof Enum<?>)
+                        Array.set(array, i, element);
+                    else Array.set(array, i, clone(element));
+                }
+                field.set(clone, array);
+            } else field.set(clone, clone(field.get(toClone)));
+        }
+    }
+
+
     public Object clone(Object toClone) throws Exception {
-        Class<?> clazz = toClone.getClass();
-        Constructor<?> constructor = clazz.getDeclaredConstructor();
+        Constructor<?> constructor = toClone.getClass().getDeclaredConstructor();
         constructor.setAccessible(true);
         Object clone = constructor.newInstance();
-        Field[] toCloneFields = clazz.getDeclaredFields();
-        for (int i = 0; i < toCloneFields.length; i++) {
-            Field modifiersField = Field.class.getDeclaredField("modifiers");
-            modifiersField.setAccessible(true);
-            modifiersField.setInt(toCloneFields[i], toCloneFields[i].getModifiers() & ~Modifier.PRIVATE & ~Modifier.FINAL);
-            toCloneFields[i].setAccessible(true);
-            toCloneFields[i].set(clone, toCloneFields[i].get(toClone));
+
+        for (Field field : toClone.getClass().getDeclaredFields()) {
+            cloneObject(toClone, clone, field);
         }
+
+        Class<?> clazz = toClone.getClass();
+        while (clazz.getSuperclass() != null) {
+            for (Field field : toClone.getClass().getSuperclass().getDeclaredFields()) {
+                cloneObject(toClone, clone, field);
+            }
+            clazz = clazz.getSuperclass();
+        }
+
         return clone;
+
     }
-
-
-    public static void main(String[] args) {
-//        System.out.println(new Agent().debrief(new Person()));
-//        Class<?> clazz = null;
-//        try {
-//            clazz = Class.forName(Person.class.getName());
-//            Constructor<?> constructor = clazz.getDeclaredConstructor(String.class);
-//            constructor.setAccessible(true);
-//            Person instance = (Person) constructor.newInstance("me");
-//            System.out.println(instance.getName());
-//        } catch (ClassNotFoundException e) {
-//            e.printStackTrace();
-//        } catch (NoSuchMethodException e) {
-//            e.printStackTrace();
-//        } catch (InvocationTargetException e) {
-//            e.printStackTrace();
-//        } catch (InstantiationException e) {
-//            e.printStackTrace();
-//        } catch (IllegalAccessException e) {
-//            e.printStackTrace();
-//        }
-    }
-
 
 }
-
-//class Cloner {
-//
-//    private Class<?> primaryClass;
-//    private Object toBeCloned;
-//
-//
-//    public Cloner(Object toBeCloned) throws NullPointerException {
-//        if (toBeCloned == null)
-//            throw new NullPointerException();
-//        this.toBeCloned = toBeCloned;
-//        this.primaryClass = toBeCloned.getClass();
-//    }
-//
-//    public Object clone() {
-//        if (toBeCloned == null)
-//            return null;
-//        if (primaryClass.isArray())
-//            return ((Array) toBeCloned).Clone();
-//        Object clone =
-//    }
-//
-//
-//}

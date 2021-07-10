@@ -325,7 +325,6 @@ public class Judge {
             clone.getInts()[0] = 25;
             clone.getBytes()[0] = 1;
             clone.getChars()[0] = 'm';
-
             assertNotEquals(container.getInts()[0], clone.getInts()[0]);
             assertNotEquals(container.getBytes()[0], clone.getBytes()[0]);
             assertNotEquals(container.getChars()[0], clone.getChars()[0]);
