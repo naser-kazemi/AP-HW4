@@ -2,7 +2,7 @@ package model.primitive;
 
 public class Stationery {
     public int price;
-    private Type type;z
+    private Type type;
 
     public Stationery() {
     }

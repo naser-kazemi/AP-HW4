@@ -7,11 +7,13 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="Reflection" />
+        <module name="Return-Of-The-Messenger" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="Reflection" target="8" />
       <module name="Reflecton" target="8" />
+      <module name="Return-Of-The-Messenger" target="8" />
     </bytecodeTargetLevel>
   </component>
 </project>
